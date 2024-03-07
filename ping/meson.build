@@ -7,6 +7,7 @@ ping = executable('ping', [
 		'ping_common.c',
 		'ping6_common.c',
 		'node_info.c',
+		'ping_exit.c',
 		git_version_h
 	],
 	include_directories : inc,

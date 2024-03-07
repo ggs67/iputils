@@ -33,6 +33,8 @@
 #include <linux/filter.h>
 #include <resolv.h>
 
+#include "ping_exit.h" /*GGS*/
+
 #ifdef HAVE_LIBCAP
 # include <sys/prctl.h>
 # include <sys/capability.h>
@@ -229,6 +231,9 @@ struct ping_rts {
 	size_t cmsglen;
 	struct ping_ni ni;
 
+    /*GGS*/
+    struct exit_condition *opt_exit_cond;
+
 	/* boolean option bits */
 	unsigned int
 		opt_adaptive:1,
@@ -245,7 +250,7 @@ struct ping_rts {
 		opt_outstanding:1,
 		opt_pingfilled:1,
 		opt_ptimeofday:1,
-		opt_quiet:1,
+		opt_quiet:2, /*GGS*/
 		opt_rroute:1,
 		opt_so_debug:1,
 		opt_so_dontroute:1,

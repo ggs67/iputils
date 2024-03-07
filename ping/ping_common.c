@@ -92,6 +92,7 @@ void usage(void)
 		"  -6                 use IPv6\n"
 		"  -F <flowlabel>     define flow label, default is random\n"
 		"  -N <nodeinfo opt>  use IPv6 node info query, try <help> as argument\n"
+        "  -x <exit-cond>     define exit condition and reporting\n"
 		"\nFor more details see ping(8).\n"
 	));
 	exit(2);
@@ -592,6 +593,8 @@ int main_loop(struct ping_rts *rts, ping_func_set_st *fset, socket_st *sock,
 
 	for (;;) {
 		/* Check exit conditions. */
+		if(rts->opt_exit_cond != NULL && check_exit_condition(rts))
+			break;
 		if (rts->exiting)
 			break;
 		if (rts->npackets && rts->nreceived + rts->nerrors >= rts->npackets)
@@ -885,63 +888,66 @@ int finish(struct ping_rts *rts)
 
 	tssub(&tv, &rts->start_time);
 
-	putchar('\n');
-	fflush(stdout);
-	printf(_("--- %s ping statistics ---\n"), rts->hostname);
-	printf(_("%ld packets transmitted, "), rts->ntransmitted);
-	printf(_("%ld received"), rts->nreceived);
-	if (rts->nrepeats)
-		printf(_(", +%ld duplicates"), rts->nrepeats);
-	if (rts->nchecksum)
-		printf(_(", +%ld corrupted"), rts->nchecksum);
-	if (rts->nerrors)
-		printf(_(", +%ld errors"), rts->nerrors);
+    if(rts->opt_quiet < 2) /*GGS*/
+    {
+		putchar('\n');
+		fflush(stdout);
+		printf(_("--- %s ping statistics ---\n"), rts->hostname);
+		printf(_("%ld packets transmitted, "), rts->ntransmitted);
+		printf(_("%ld received"), rts->nreceived);
+		if (rts->nrepeats)
+			printf(_(", +%ld duplicates"), rts->nrepeats);
+		if (rts->nchecksum)
+			printf(_(", +%ld corrupted"), rts->nchecksum);
+		if (rts->nerrors)
+			printf(_(", +%ld errors"), rts->nerrors);
 
-	if (rts->ntransmitted) {
-#ifdef USE_IDN
-		setlocale(LC_ALL, "C");
-#endif
-		printf(_(", %g%% packet loss"),
-		       (float)((((long long)(rts->ntransmitted - rts->nreceived)) * 100.0) / rts->ntransmitted));
-		printf(_(", time %ldms"), 1000 * tv.tv_sec + (tv.tv_nsec + 500000) / 1000000);
+		if (rts->ntransmitted) {
+	#ifdef USE_IDN
+			setlocale(LC_ALL, "C");
+	#endif
+			printf(_(", %g%% packet loss"),
+				(float)((((long long)(rts->ntransmitted - rts->nreceived)) * 100.0) / rts->ntransmitted));
+			printf(_(", time %ldms"), 1000 * tv.tv_sec + (tv.tv_nsec + 500000) / 1000000);
+		}
+
+		putchar('\n');
+
+		if (rts->nreceived && rts->timing) {
+			double tmdev;
+			long total = rts->nreceived + rts->nrepeats;
+			long tmavg = rts->tsum / total;
+			long long tmvar;
+
+			if (rts->tsum < INT_MAX)
+				/* This slightly clumsy computation order is important to avoid
+				* integer rounding errors for small ping times. */
+				tmvar = (rts->tsum2 - ((rts->tsum * rts->tsum) / total)) / total;
+			else
+				tmvar = (rts->tsum2 / total) - (tmavg * tmavg);
+
+			tmdev = llsqrt(tmvar);
+
+			printf(_("rtt min/avg/max/mdev = %ld.%03ld/%lu.%03ld/%ld.%03ld/%ld.%03ld ms"),
+				(long)rts->tmin / 1000, (long)rts->tmin % 1000,
+				(unsigned long)(tmavg / 1000), (long)(tmavg % 1000),
+				(long)rts->tmax / 1000, (long)rts->tmax % 1000,
+				(long)tmdev / 1000, (long)tmdev % 1000);
+			comma = ", ";
+		}
+		if (rts->pipesize > 1) {
+			printf(_("%spipe %d"), comma, rts->pipesize);
+			comma = ", ";
+		}
+
+		if (rts->nreceived && (!rts->interval || rts->opt_flood || rts->opt_adaptive) && rts->ntransmitted > 1) {
+			int ipg = (1000000 * (long long)tv.tv_sec + tv.tv_nsec / 1000) / (rts->ntransmitted - 1);
+
+			printf(_("%sipg/ewma %d.%03d/%d.%03d ms"),
+				comma, ipg / 1000, ipg % 1000, rts->rtt / 8000, (rts->rtt / 8) % 1000);
+		}
+		putchar('\n');
 	}
-
-	putchar('\n');
-
-	if (rts->nreceived && rts->timing) {
-		double tmdev;
-		long total = rts->nreceived + rts->nrepeats;
-		long tmavg = rts->tsum / total;
-		long long tmvar;
-
-		if (rts->tsum < INT_MAX)
-			/* This slightly clumsy computation order is important to avoid
-			 * integer rounding errors for small ping times. */
-			tmvar = (rts->tsum2 - ((rts->tsum * rts->tsum) / total)) / total;
-		else
-			tmvar = (rts->tsum2 / total) - (tmavg * tmavg);
-
-		tmdev = llsqrt(tmvar);
-
-		printf(_("rtt min/avg/max/mdev = %ld.%03ld/%lu.%03ld/%ld.%03ld/%ld.%03ld ms"),
-		       (long)rts->tmin / 1000, (long)rts->tmin % 1000,
-		       (unsigned long)(tmavg / 1000), (long)(tmavg % 1000),
-		       (long)rts->tmax / 1000, (long)rts->tmax % 1000,
-		       (long)tmdev / 1000, (long)tmdev % 1000);
-		comma = ", ";
-	}
-	if (rts->pipesize > 1) {
-		printf(_("%spipe %d"), comma, rts->pipesize);
-		comma = ", ";
-	}
-
-	if (rts->nreceived && (!rts->interval || rts->opt_flood || rts->opt_adaptive) && rts->ntransmitted > 1) {
-		int ipg = (1000000 * (long long)tv.tv_sec + tv.tv_nsec / 1000) / (rts->ntransmitted - 1);
-
-		printf(_("%sipg/ewma %d.%03d/%d.%03d ms"),
-		       comma, ipg / 1000, ipg % 1000, rts->rtt / 8000, (rts->rtt / 8) % 1000);
-	}
-	putchar('\n');
 	return (!rts->nreceived || (rts->deadline && rts->nreceived < rts->npackets));
 }
 

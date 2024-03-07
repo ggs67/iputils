@@ -394,18 +394,20 @@ int ping6_run(struct ping_rts *rts, int argc, char **argv, struct addrinfo *ai,
 			error(2, errno, _("can't send flowinfo"));
 	}
 
-	printf(_("PING %s (%s) "), rts->hostname, pr_raw_addr(rts, &rts->whereto6, sizeof rts->whereto6));
-	if (rts->flowlabel)
-		printf(_(", flow 0x%05x, "), (unsigned)ntohl(rts->flowlabel));
-	if (rts->device || rts->opt_strictsource) {
-		int saved_opt_numeric = rts->opt_numeric;
+    if(rts->opt_quiet < 2)
+	{
+		printf(_("PING %s (%s) "), rts->hostname, pr_raw_addr(rts, &rts->whereto6, sizeof rts->whereto6));
+		if (rts->flowlabel)
+			printf(_(", flow 0x%05x, "), (unsigned)ntohl(rts->flowlabel));
+		if (rts->device || rts->opt_strictsource) {
+			int saved_opt_numeric = rts->opt_numeric;
 
-		rts->opt_numeric = 1;
-		printf(_("from %s %s: "), pr_addr(rts, &rts->source6, sizeof rts->source6), rts->device ? rts->device : "");
-		rts->opt_numeric = saved_opt_numeric;
+			rts->opt_numeric = 1;
+			printf(_("from %s %s: "), pr_addr(rts, &rts->source6, sizeof rts->source6), rts->device ? rts->device : "");
+			rts->opt_numeric = saved_opt_numeric;
+		}
+		printf(_("%zu data bytes\n"), rts->datalen);
 	}
-	printf(_("%zu data bytes\n"), rts->datalen);
-
 	setup(rts, sock);
 
 	drop_capabilities();

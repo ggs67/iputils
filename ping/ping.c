@@ -341,6 +341,7 @@ main(int argc, char **argv)
 	/* FIXME: global_rts will be removed in future */
 	global_rts = &rts;
 
+    on_exit(exit_cond_last_gasp, NULL); // THIS MUST BE FISRT (called last) atexit / on_exit ENTRY !!!! /*GGS*/
 	atexit(close_stdout);
 	limit_capabilities(&rts);
 
@@ -363,7 +364,7 @@ main(int argc, char **argv)
 		hints.ai_family = AF_INET6;
 
 	/* Parse command line options */
-	while ((ch = getopt(argc, argv, "h?" "4bRT:" "6F:N:" "aABc:CdDe:fHi:I:l:Lm:M:nOp:qQ:rs:S:t:UvVw:W:")) != EOF) {
+	while ((ch = getopt(argc, argv, "h?" "4bRT:" "6F:N:" "aABc:CdDe:fHi:I:l:Lm:M:nOp:qQ:rs:S:t:UvVw:W:x:")) != EOF) {
 		switch(ch) {
 		/* IPv4 specific options */
 		case '4':
@@ -561,6 +562,11 @@ main(int argc, char **argv)
 			rts.lingertime = (int)(optval * 1000);
 		}
 			break;
+	    /*GGS*/
+        case 'x':
+		    rts.opt_exit_cond = parse_exit_cond(optarg);
+			if(rts.opt_exit_cond->flags & (EXIT_REPORT_FAILURES | EXIT_REPORT_SUCCESS))  rts.opt_quiet = 2;
+		    break;
 		default:
 			usage();
 			break;
@@ -691,6 +697,11 @@ main(int argc, char **argv)
 		assert(ai->ai_next);
 	}
 
+    /*GGS*/
+    /*Print exit condition report if requested */
+    print_exit_cond_report(&rts, 0);
+
+    if(rts.opt_exit_cond) free(rts.opt_exit_cond);
 	freeaddrinfo(result);
 	free(rts.outpack);
 
@@ -1019,10 +1030,13 @@ int ping4_run(struct ping_rts *rts, int argc, char **argv, struct addrinfo *ai,
 	if (!(packet = (unsigned char *)malloc((unsigned int)packlen)))
 		error(2, errno, _("memory allocation failed"));
 
-	printf(_("PING %s (%s) "), rts->hostname, inet_ntoa(rts->whereto.sin_addr));
-	if (rts->device || rts->opt_strictsource)
-		printf(_("from %s %s: "), inet_ntoa(rts->source.sin_addr), rts->device ? rts->device : "");
-	printf(_("%zu(%zu) bytes of data.\n"), rts->datalen, rts->datalen + 8 + rts->optlen + 20);
+    if(rts->opt_quiet < 2) /*GGS*/
+	{
+		printf(_("PING %s (%s) "), rts->hostname, inet_ntoa(rts->whereto.sin_addr));
+		if (rts->device || rts->opt_strictsource)
+			printf(_("from %s %s: "), inet_ntoa(rts->source.sin_addr), rts->device ? rts->device : "");
+		printf(_("%zu(%zu) bytes of data.\n"), rts->datalen, rts->datalen + 8 + rts->optlen + 20);
+	}
 
 	setup(rts, sock);
 	if (rts->opt_connect_sk &&
