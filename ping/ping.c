@@ -341,7 +341,7 @@ main(int argc, char **argv)
 	/* FIXME: global_rts will be removed in future */
 	global_rts = &rts;
 
-    on_exit(exit_cond_last_gasp, NULL); // THIS MUST BE FISRT (called last) atexit / on_exit ENTRY !!!! /*GGS*/
+    //on_exit(exit_cond_last_gasp, NULL); // THIS MUST BE FISRT (called last) atexit / on_exit ENTRY !!!! /*GGS*/
 	atexit(close_stdout);
 	limit_capabilities(&rts);
 
@@ -562,10 +562,8 @@ main(int argc, char **argv)
 			rts.lingertime = (int)(optval * 1000);
 		}
 			break;
-	    /*GGS*/
-        case 'x':
+        case 'x': /*GGS*/
 		    rts.opt_exit_cond = parse_exit_cond(optarg);
-			if(rts.opt_exit_cond->flags & (EXIT_REPORT_FAILURES | EXIT_REPORT_SUCCESS))  rts.opt_quiet = 2;
 		    break;
 		default:
 			usage();
@@ -573,7 +571,17 @@ main(int argc, char **argv)
 		}
 	}
 
-	argc -= optind;
+    /*GGS*/
+    /*
+     * Now after all ptions have been evaluated we can re-evaluate the quiet option if we have
+     * an exit condition
+     */
+    if(rts.opt_exit_cond)
+    {
+        if((rts.opt_exit_cond->flags & EXIT_REPORT_FLAGS) && (rts.opt_exit_cond->flags & EXIT_REPORT_SILENT))  rts.opt_quiet = 2;
+    }
+
+    argc -= optind;
 	argv += optind;
 
 	if (!argc)
@@ -700,8 +708,9 @@ main(int argc, char **argv)
     /*GGS*/
     /*Print exit condition report if requested */
     print_exit_cond_report(&rts, 0);
+    ret_val = exit_cond_status_update(ret_val);
 
-    if(rts.opt_exit_cond) free(rts.opt_exit_cond);
+    if(rts.opt_exit_cond) free(rts.opt_exit_cond); /*GGS*/
 	freeaddrinfo(result);
 	free(rts.outpack);
 

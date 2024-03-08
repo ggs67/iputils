@@ -23,7 +23,7 @@ struct ping_rts; // Forward definition
 #define DEBUG_MAP_EXTENSION 0
 #endif
 
-#define EXIT_COUNTER_TYPE uint32_t
+#define EXIT_COUNTER_TYPE long // compatible with struct ping_rts counters
 
 // flags definitions
 #define EXIT_COUNT_FAILED 1   // Count failed pings (default=success)
@@ -32,15 +32,17 @@ struct ping_rts; // Forward definition
 #define EXIT_REPORT_SUCCESS 8 // Print out only success count  \_ Both otgether print out <success>/<fail>
 #define EXIT_REPORT_FAILURES 16 // print out only falure count /
 #define EXIT_REPORT_MAP   32  // Report ping map
+#define EXIT_REPORT_SILENT 64 // Report only the exit status information (if any report requested!)
+#define EXIT_REPORT_STATE 128 // Report condition state at exit 'T'/'F'
 
 #define EXIT_COND_LOC_FLAGS EXIT_SEQUENCE
 
-#define EXIT_REPORT_FLAGS (EXIT_REPORT_SUCCESS | EXIT_REPORT_FAILURES)
+#define EXIT_REPORT_FLAGS (EXIT_REPORT_SUCCESS | EXIT_REPORT_FAILURES | EXIT_REPORT_MAP | EXIT_REPORT_STATE)
 
 #define EXIT_DEFAULT_SUCCESS_MAP '+'
 #define EXIT_DEFAULT_FAILURE_MAP '-'
 
-#define EXIT_COND_OPTIONS "xnNm"
+#define EXIT_COND_OPTIONS "xnNmqc"
 
 #if DEBUG_MAP_EXTENSION
 #define EXIT_COND_DEFAULT_MAP_SIZE 20
@@ -58,8 +60,8 @@ struct ping_rts; // Forward definition
 struct exit_condition
 {
   EXIT_COUNTER_TYPE expect;   // expected count
-  EXIT_COUNTER_TYPE success_seq; // Current sequence length of expected status
-  EXIT_COUNTER_TYPE failed_seq; 
+  EXIT_COUNTER_TYPE ntransmitted; // Currently known sequence state
+  EXIT_COUNTER_TYPE nreceived;
   EXIT_COUNTER_TYPE sequence;
   int condition_met;
   char map_chars[2];          // [0]=failure [1]=sucess
@@ -72,8 +74,8 @@ struct exit_condition
 
 #define INIT_EXIT_CONDITION(ptr) \
     (ptr)->expect = 0;\
-    (ptr)->success_seq = 0;\
-    (ptr)->failed_seq = 0;\
+    (ptr)->ntransmitted = 0;\
+    (ptr)->nreceived = 0;\
     (ptr)->sequence = 0;\
     (ptr)->condition_met = 0;\
     (ptr)->map_chars[0] = EXIT_DEFAULT_FAILURE_MAP; (ptr)->map_chars[1] = EXIT_DEFAULT_SUCCESS_MAP;\
@@ -87,5 +89,6 @@ extern struct exit_condition *parse_exit_cond(char *opt);
 extern int check_exit_condition(struct ping_rts *rts);
 extern void exit_cond_last_gasp(int status, void *arg);
 extern void print_exit_cond_report(struct ping_rts *rts, int force);
+extern int exit_cond_status_update(int status);
 
 #endif /* IPUTILS_PING_H */
